@@ -40,10 +40,10 @@ Next.js Server
 Next.js figures out which components belong to this route:
 
 * **Server Components**
-  Default type. No `"use client"` at the top.
+  Default type. No "use client" at the top.
 
 * **Client Components**
-  Must start with `"use client"`. These require browser-side JavaScript.
+  Must start with "use client". These require browser-side JavaScript.
 
 Next.js builds the full layout hierarchy:
 
@@ -94,46 +94,137 @@ This is where:
 
 ### Static vs Dynamic Server Components
 
-Server Components can be **static** or **dynamic**, depending on how and when they fetch/render their data:
+Next.js 16 uses a **new cache system**, so “static” no longer always means “build-time.” Instead:
 
-* **Static Server Components (SSG / Build-time)**:
+## ✔️ Three types of Server Component rendering in Next.js 16
 
-  * Rendered **once at build time**.
-  * Pre-rendered HTML and RSC Payload fragments are stored on disk or memory.
-  * Ideal for pages with data that rarely changes.
-  * Example:
+---
+
+## 1. **Build-time Static Rendering (rare)**
+
+Only happens when ALL of these are true:
+
+* route has **no dynamic segments**
+* no dynamic fetches
+* no cookies/headers
+* no searchParams reading
+* no server actions
+
+Example:
 
 ```jsx
-// app/about/page.jsx
-export default function AboutPage() {
-  return <div>Our company info</div>;
+// /about (fully static)
+export default function About() {
+  return <div>About us</div>;
 }
 ```
 
-* **Dynamic Server Components (SSR / Runtime)**:
+➡️ Next.js **pre-renders HTML + RSC Payload at build time**.
+➡️ CDN can serve it directly.
 
-  * Rendered **on every request**.
-  * Fetches live data from APIs or databases each time.
-  * Example:
+---
+
+## 2. **Runtime Static Rendering (MOST COMMON)**
+
+This is what “static Server Component” usually means in the **App Router**.
+
+* Happens for routes like `/products/[id]`
+* Component has no dynamic flags
+* Fetches are cached (`cache: 'force-cache'`) or default
+
+BUT:
+➡️ Next.js **cannot** pre-render at build time because IDs are unknown.
+➡️ So it renders the page **on first request**, generates the RSC Payload + HTML, and stores that in the **Next.js Persistent Cache**.
+
+Then:
+
+* Future requests for the same path use the cached version
+* CDN can cache *after* the first render
+
+Example:
 
 ```jsx
-// app/products/[id]/page.jsx
-export const dynamic = 'force-dynamic'; // ensures server-side rendering
-export default async function ProductPage({ params }) {
-  const res = await fetch(`https://api.example.com/products/${params.id}`);
-  const product = await res.json();
-  return <div>{product.name}</div>;
-}
+// /products/[id]
+export const revalidate = 3600; // allow ISR-style caching
 ```
 
-**How the server builds the first HTML:**
+Flow:
 
-1. **Static fragments** are read from **disk or server memory cache** (prebuilt at build time). The server does **not fetch them from CDN**.
-2. **Dynamic fragments** are rendered live using SSR.
-3. Server **merges static + dynamic fragments** into full HTML + RSC Payload.
-4. The response can then be cached on a CDN for subsequent requests.
+```
+First request  -> render on server -> store in server cache
+Later requests -> served from Next.js cache or CDN
+```
 
-**Diagram:**
+---
+
+## 3. **Dynamic Rendering (SSR)**
+
+If the page uses any dynamic features:
+
+* `export const dynamic = 'force-dynamic'`
+* `fetch(..., { cache: 'no-store' })`
+* reading cookies or headers
+* searchParams affecting logic
+* server actions
+
+Then:
+➡️ page renders **on every request**, not cached.
+➡️ CDN cannot cache (unless forced manually).
+
+Example:
+
+```jsx
+export const dynamic = 'force-dynamic';
+```
+
+---
+
+## 🌟 How this affects HTML generation in Step 3
+
+When Next.js begins rendering the page:
+
+### **Where do static fragments come from?**
+
+* **Build-time static:** from the build output (disk/memory)
+* **Runtime static:** from the **Next.js server cache**, if already cached
+
+  * If first time -> Next.js renders them and stores them
+
+### **Where do dynamic fragments come from?**
+
+* Rendered fresh on the server for every request
+
+### **Important:**
+
+👉 **Next.js server NEVER pulls static fragments from CDN when assembling HTML.**
+It only reads from:
+
+* build output
+* its own runtime cache
+
+CDN participates **after HTML is generated**, not before.
+
+---
+
+Diagram:
+
+```
+Client requests /products/123
+       |
+       v
+Next.js Server
+   |-- Build-time static? --> read from build output
+   |-- Runtime static? ----> fetch from Next.js cache OR generate on first request
+   |-- Dynamic? -----------> generate fresh
+       |
+       v
+Merge fragments --> HTML + RSC Payload
+       |
+       v
+Send HTML to client (CDN may cache after)
+```
+
+Diagram::**
 
 ```
 Client requests /products/123
