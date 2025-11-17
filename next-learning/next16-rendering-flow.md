@@ -339,7 +339,7 @@ Key point:
 The user immediately sees the full page.
 
 * Server Components render as real HTML
-* Client Components render as placeholders (HTML looks correct, but not interactive yet)
+* Client Components appear as **placeholders** (slots) — the actual interactive content is not yet rendered and will appear only after React hydration.
 
 **Diagram:**
 
@@ -348,7 +348,7 @@ Browser
   HTML Rendered:
   <h1>Product Name</h1>
   <p>Product description...</p>
-  <div id="AddToCartButton-123"></div>
+  <div id="AddToCartButton-123"></div> <!-- placeholder for client component -->
 ```
 
 ---
@@ -378,7 +378,7 @@ Hydration process:
 
 * Reuses the already-rendered HTML
 * Attaches React logic and event listeners
-* Makes Client Components interactive
+* Mounts Client Components in the placeholders to make them interactive
 
 **Code example (Client Component):**
 
@@ -397,7 +397,7 @@ export default function AddToCartButton({ productId }) {
 HTML Placeholder      RSC Payload
       |                  |
       v                  v
-  React attaches events --> Interactive Client Components
+  React mounts content --> Interactive Client Components
 ```
 
 Once hydration finishes:
