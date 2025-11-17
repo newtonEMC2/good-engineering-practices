@@ -339,7 +339,7 @@ Key point:
 The user immediately sees the full page.
 
 * Server Components render as real HTML
-* Client Components appear as **placeholders** (slots) — the actual interactive content is not yet rendered and will appear only after React hydration.
+* Client Components render as **placeholders** (empty slots). The layout appears correct, but interactivity is not yet attached.
 
 **Diagram:**
 
@@ -374,17 +374,29 @@ Server Components remain server-only.
 
 # 8. React Hydrates Client Components Using the RSC Payload
 
-Hydration process:
+Hydration is the process where React takes the **placeholders rendered on the server** and makes them interactive.
 
-* Reuses the already-rendered HTML
-* Attaches React logic and event listeners
-* Mounts Client Components in the placeholders to make them interactive
+**Detailed explanation:**
 
-**Code example (Client Component):**
+1. **Identify placeholders:** React finds the DOM nodes where Client Components should mount.
+2. **Use the RSC Payload:** React reads the RSC Payload to determine:
+
+   * Which component corresponds to each placeholder
+   * Props to pass
+   * Component hierarchy
+3. **Mount Client Components:** React replaces placeholders with fully functional React components.
+4. **Attach event listeners and restore state:** Interactivity is activated without re-rendering the entire page.
+
+**Key points:**
+
+* Only Client Components are hydrated; Server Components remain static HTML
+* Hydration reuses existing HTML to avoid layout shifts
+* Can be progressive, improving perceived performance on large pages
+
+**Example (Client Component):**
 
 ```jsx
 "use client";
-
 export default function AddToCartButton({ productId }) {
   const handleClick = () => alert(`Added ${productId} to cart`);
   return <button onClick={handleClick}>Add to Cart</button>;
@@ -397,12 +409,15 @@ export default function AddToCartButton({ productId }) {
 HTML Placeholder      RSC Payload
       |                  |
       v                  v
-  React mounts content --> Interactive Client Components
+React mounts components --> Attaches event listeners
+      |
+      v
+Fully interactive UI
 ```
 
 Once hydration finishes:
 
-👉 **The page becomes fully interactive.**
+👉 **The page is fully interactive.**
 
 ---
 
